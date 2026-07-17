@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, CheckCircle, FileText, Info, LayoutDashboard, Stethoscope, Download, Search, PanelRight, X, PenLine, Type, Sparkles } from 'lucide-react';
+import { BookOpen, CheckCircle, FileText, Info, LayoutDashboard, Stethoscope, Download, Search, PanelRight, X, PenLine, Type, Sparkles, Image as ImageIcon, Loader2, Link2, Plus, Trash2 } from 'lucide-react';
 import { trialData, reportOutline, structuralRationale, guidelines } from './data';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -8,12 +8,18 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
+  const [hasGeneratedDiagram, setHasGeneratedDiagram] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>(() => {
     const saved = localStorage.getItem('medwrite_notes');
     return saved ? JSON.parse(saved) : { overview: '', outline: '', rationale: '', guidelines: '' };
   });
   const [checklist, setChecklist] = useState<Record<string, boolean>>(() => {
     const saved = localStorage.getItem('medwrite_checklist');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [citations, setCitations] = useState<Record<string, string[]>>(() => {
+    const saved = localStorage.getItem('medwrite_citations');
     return saved ? JSON.parse(saved) : {};
   });
 
@@ -25,8 +31,27 @@ export default function App() {
     localStorage.setItem('medwrite_checklist', JSON.stringify(checklist));
   }, [checklist]);
 
+  useEffect(() => {
+    localStorage.setItem('medwrite_citations', JSON.stringify(citations));
+  }, [citations]);
+
   const toggleChecklistItem = (id: string) => {
     setChecklist(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const addCitation = (id: string, citation: string) => {
+    if (!citation.trim()) return;
+    setCitations(prev => ({
+      ...prev,
+      [id]: [...(prev[id] || []), citation.trim()]
+    }));
+  };
+
+  const removeCitation = (id: string, index: number) => {
+    setCitations(prev => ({
+      ...prev,
+      [id]: prev[id].filter((_, i) => i !== index)
+    }));
   };
 
   const exportCurrentView = () => {
@@ -52,8 +77,16 @@ export default function App() {
         filteredOutline.forEach((section) => {
           content += `${section.title}\n`;
           content += `Description: ${section.description}\n`;
-          section.subsections.forEach(sub => {
-            content += `  - ${sub}\n`;
+          section.subsections.forEach((sub, idx) => {
+            const itemId = `${section.id}-${idx}`;
+            const isChecked = checklist[itemId] ? '[x]' : '[ ]';
+            content += `  ${isChecked} ${sub}\n`;
+            if (citations[itemId] && citations[itemId].length > 0) {
+              content += `      Citations:\n`;
+              citations[itemId].forEach(cit => {
+                content += `      - ${cit}\n`;
+              });
+            }
           });
           content += '\n';
         });
@@ -73,9 +106,23 @@ export default function App() {
         filteredGuidelines.forEach(guide => {
           content += `${guide.name}\n`;
           content += `${guide.description}\n`;
+          const guideId = `guide-${guide.id}`;
+          if (citations[guideId] && citations[guideId].length > 0) {
+            content += `  Citations:\n`;
+            citations[guideId].forEach(cit => {
+              content += `  - ${cit}\n`;
+            });
+          }
           content += `Key Principles:\n`;
-          guide.keyPoints.forEach(point => {
+          guide.keyPoints.forEach((point, idx) => {
+            const pointId = `${guide.id}-pt-${idx}`;
             content += `  - ${point}\n`;
+            if (citations[pointId] && citations[pointId].length > 0) {
+              content += `      Citations:\n`;
+              citations[pointId].forEach(cit => {
+                content += `      - ${cit}\n`;
+              });
+            }
           });
           content += '\n';
         });
@@ -91,6 +138,15 @@ export default function App() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleGenerateDiagram = () => {
+    setIsGeneratingDiagram(true);
+    // Simulate generation delay
+    setTimeout(() => {
+      setIsGeneratingDiagram(false);
+      setHasGeneratedDiagram(true);
+    }, 2500);
   };
 
   const filteredOutline = reportOutline.map(section => {
@@ -352,6 +408,56 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200">
+                  <SectionTitle tSize={tSize}>Methodology Flowchart</SectionTitle>
+                  
+                  {!hasGeneratedDiagram && !isGeneratingDiagram && (
+                    <div className="mt-4 p-8 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center bg-slate-50">
+                      <ImageIcon className="w-12 h-12 text-slate-300 mb-4" />
+                      <p className={`text-slate-600 mb-6 text-center ${tSize('sm')}`}>
+                        Generate a visual conceptual flowchart of the methodology using AI.
+                      </p>
+                      <button
+                        onClick={handleGenerateDiagram}
+                        className="flex items-center space-x-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        <span>Generate Flowchart</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {isGeneratingDiagram && (
+                    <div className="mt-4 p-12 border border-slate-200 rounded-xl flex flex-col items-center justify-center bg-slate-50">
+                      <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
+                      <p className={`text-slate-600 font-medium ${tSize('sm')} animate-pulse`}>
+                        Synthesizing methodology data and rendering flowchart...
+                      </p>
+                    </div>
+                  )}
+
+                  {hasGeneratedDiagram && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="mt-4"
+                    >
+                      <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100 flex justify-center">
+                        <img 
+                          src="https://picsum.photos/seed/trialflowchart123/1200/600" 
+                          alt="Trial Methodology Conceptual Flowchart" 
+                          className="w-full h-auto object-cover opacity-90 mix-blend-multiply"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <p className={`text-center mt-3 text-slate-500 ${tSize('xs')} italic flex items-center justify-center gap-1.5`}>
+                        <Sparkles className="w-3 h-3 text-blue-400" />
+                        Conceptual flowchart representing the {trialData.phase} trial methodology (Generated Asset)
+                      </p>
+                    </motion.div>
+                  )}
+                </div>
               </motion.div>
             )}
 
@@ -384,20 +490,29 @@ export default function App() {
                           const itemId = `${section.id}-${idx}`;
                           const isChecked = checklist[itemId] || false;
                           return (
-                            <li key={idx} className="flex items-start space-x-3">
-                              <button 
-                                onClick={() => toggleChecklistItem(itemId)}
-                                className="focus:outline-none shrink-0 mt-0.5 hover:scale-110 transition-transform"
-                              >
-                                {isChecked ? (
-                                  <CheckCircle className="w-5 h-5 text-emerald-500" />
-                                ) : (
-                                  <div className="w-5 h-5 rounded-full border-2 border-slate-300 hover:border-blue-400 transition-colors" />
-                                )}
-                              </button>
-                              <span className={`${tSize('sm')} font-medium transition-colors duration-200 ${isChecked ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                                {sub}
-                              </span>
+                            <li key={idx} className="flex flex-col">
+                              <div className="flex items-start space-x-3">
+                                <button 
+                                  onClick={() => toggleChecklistItem(itemId)}
+                                  className="focus:outline-none shrink-0 mt-0.5 hover:scale-110 transition-transform"
+                                >
+                                  {isChecked ? (
+                                    <CheckCircle className="w-5 h-5 text-emerald-500" />
+                                  ) : (
+                                    <div className="w-5 h-5 rounded-full border-2 border-slate-300 hover:border-blue-400 transition-colors" />
+                                  )}
+                                </button>
+                                <span className={`${tSize('sm')} font-medium transition-colors duration-200 ${isChecked ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                                  {sub}
+                                </span>
+                              </div>
+                              <CitationManager
+                                itemId={itemId}
+                                citations={citations[itemId] || []}
+                                onAdd={addCitation}
+                                onRemove={removeCitation}
+                                tSize={tSize}
+                              />
                             </li>
                           );
                         })}
@@ -453,17 +568,38 @@ export default function App() {
                       <BookOpen className="w-5 h-5 text-indigo-500" />
                       <h3 className={`${tSize('lg')} font-bold text-slate-900`}>{guide.name}</h3>
                     </div>
-                    <p className={`${tSize('sm')} text-slate-600 mb-5`}>{guide.description}</p>
+                    <p className={`${tSize('sm')} text-slate-600 mb-2`}>{guide.description}</p>
+                    <div className="mb-5">
+                      <CitationManager
+                        itemId={`guide-${guide.id}`}
+                        citations={citations[`guide-${guide.id}`] || []}
+                        onAdd={addCitation}
+                        onRemove={removeCitation}
+                        tSize={tSize}
+                      />
+                    </div>
                     
                     <div className="bg-slate-50 rounded-lg p-4">
                       <h4 className={`${tSize('xs')} font-bold text-slate-900 uppercase tracking-wider mb-3`}>Key Principles</h4>
-                      <ul className="space-y-2">
-                        {guide.keyPoints.map((point, idx) => (
-                          <li key={idx} className={`flex items-start space-x-2 ${tSize('sm')} text-slate-700`}>
-                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
-                            <span className="leading-relaxed">{point}</span>
-                          </li>
-                        ))}
+                      <ul className="space-y-4">
+                        {guide.keyPoints.map((point, idx) => {
+                          const pointId = `${guide.id}-pt-${idx}`;
+                          return (
+                            <li key={idx} className="flex flex-col">
+                              <div className={`flex items-start space-x-2 ${tSize('sm')} text-slate-700`}>
+                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
+                                <span className="leading-relaxed">{point}</span>
+                              </div>
+                              <CitationManager
+                                itemId={pointId}
+                                citations={citations[pointId] || []}
+                                onAdd={addCitation}
+                                onRemove={removeCitation}
+                                tSize={tSize}
+                              />
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   </div>
@@ -536,5 +672,57 @@ function SectionTitle({ children, tSize }: { children: React.ReactNode, tSize: (
     <h4 className={`${tSize('sm')} font-bold text-slate-900 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2`}>
       {children}
     </h4>
+  );
+}
+
+function CitationManager({ itemId, citations, onAdd, onRemove, tSize }: { itemId: string, citations: string[], onAdd: (id: string, text: string) => void, onRemove: (id: string, idx: number) => void, tSize: (size: any) => string }) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newCitation, setNewCitation] = useState('');
+
+  const handleAdd = () => {
+    if (newCitation.trim()) {
+      onAdd(itemId, newCitation);
+      setNewCitation('');
+      setIsAdding(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 ml-7 pl-3 border-l-2 border-slate-200">
+      {citations.length > 0 && (
+        <ul className="space-y-1 mb-2">
+          {citations.map((cit, idx) => (
+            <li key={idx} className={`flex items-start space-x-2 text-slate-500 ${tSize('xs')}`}>
+              <Link2 className="w-3 h-3 mt-0.5 shrink-0" />
+              <span className="flex-1 break-words">{cit}</span>
+              <button onClick={() => onRemove(itemId, idx)} className="text-slate-400 hover:text-red-500 shrink-0">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      
+      {isAdding ? (
+        <div className="flex items-center space-x-2 mt-2">
+          <input 
+            type="text" 
+            value={newCitation}
+            onChange={(e) => setNewCitation(e.target.value)}
+            placeholder="Enter citation (e.g., DOI, URL, or Title)"
+            className={`flex-1 border border-slate-200 rounded px-2 py-1 ${tSize('xs')} focus:outline-none focus:border-blue-400`}
+            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            autoFocus
+          />
+          <button onClick={handleAdd} className="text-blue-600 hover:text-blue-800 font-medium text-xs">Save</button>
+          <button onClick={() => { setIsAdding(false); setNewCitation(''); }} className="text-slate-400 hover:text-slate-600 font-medium text-xs">Cancel</button>
+        </div>
+      ) : (
+        <button onClick={() => setIsAdding(true)} className={`flex items-center space-x-1 text-slate-400 hover:text-blue-500 ${tSize('xs')} font-medium transition-colors`}>
+          <Plus className="w-3 h-3" />
+          <span>Add Citation</span>
+        </button>
+      )}
+    </div>
   );
 }
