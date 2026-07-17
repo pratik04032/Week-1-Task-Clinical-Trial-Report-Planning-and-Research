@@ -1,0 +1,6 @@
+{
+  "name": "Clinical Trial Report Planner",
+  "description": "A comprehensive planning and research outline tool for clinical trial reporting, featuring study overviews, report structuring, and regulatory guidelines.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
